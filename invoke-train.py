@@ -443,15 +443,23 @@ class ModeTrain():
                     noise_pred = self.unet(noisy_latents, timesteps,
                                            encoder_hidden_states.to(weight_dtype)).sample
 
+                    # self.noise_scheduler.config = "v_prediction"
+                    # print("FUCK", self.noise_scheduler.config)
+
+                    # HACK - NOTE - for some reason the noise scheduler does not contain a 'config' property,
+                    # so I'm forcing the 'epsilon' behavior since the opposite doesn't work. This is a recent
+                    # change since I've moved to conda, but even the old pip venv isn't working. So something
+                    # is going on here that I can't account for.
+
                     # Get the target for loss depending on the prediction type
-                    if self.noise_scheduler.config.prediction_type == "epsilon":
-                        target = noise
-                    elif self.noise_scheduler.config.prediction_type == "v_prediction":
-                        target = self.noise_scheduler.get_velocity(
-                            latents, noise, timesteps)
-                    else:
-                        raise ValueError(
-                            f"Unknown prediction type {self.noise_scheduler.config.prediction_type}")
+                    # if self.noise_scheduler.config.prediction_type == "epsilon":
+                    target = noise
+                    # elif self.noise_scheduler.config.prediction_type == "v_prediction":
+                    #     target = self.noise_scheduler.get_velocity(
+                    #         latents, noise, timesteps)
+                    # else:
+                    #     raise ValueError(
+                    #         f"Unknown prediction type {self.noise_scheduler.config.prediction_type}")
 
                     loss = F.mse_loss(noise_pred, target, reduction="none").mean(
                         [1, 2, 3]).mean()
