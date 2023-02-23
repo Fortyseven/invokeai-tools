@@ -21,6 +21,7 @@ console = Console()
 
 DEFAULT_INPUT_IMAGE_PATH = "images"
 DEFAULT_OUTPUT_IMAGE_PATH = "embeddings"
+DEFAULT_TRAINING_STEPS = 3000
 PROJECT_CONFIG_FILE = "project.json"
 
 # pretrained_model_name_or_path = "stabilityai/stable-diffusion-2"
@@ -569,8 +570,8 @@ class ModeInit():
 
         while not self.config['max_train_steps']:
             self.config['max_train_steps'] = IntPrompt.ask(
-                "How many steps should be trained for? (2500 is good)",
-                default=2500
+                "How many steps should be trained for?",
+                default=DEFAULT_TRAINING_STEPS
             )
 
         while not self.config['initializer_token']:
