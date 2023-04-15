@@ -3,6 +3,7 @@
 # This is a reworking of the training notebook from the stable diffusion repo
 
 import shutil
+from tarfile import TarFile
 from torch.utils.data import Dataset
 import argparse
 import itertools
@@ -11,6 +12,7 @@ import math
 import os
 import random
 import sys
+import datetime
 
 from PIL import Image
 from rich import print
@@ -614,6 +616,104 @@ class ModeInit():
             f"Embed checkpoints will be in '[bold]{self.config['output_path']}[/bold]'...")
 
 
+
+class ModeArchive():
+    ''' Removes intermediate folders and creates a zip backup of the project using the name of the project folder. '''
+
+    def __init__(self, config, args):
+        global console
+        self.config = config
+        self.args = args
+        self.console = console
+
+    def run(self):
+        # get INVOKEAI_ROOT envrionment variable
+        INVOKEAI_ROOT = os.environ.get('INVOKEAI_ROOT')
+
+        # check if INVOKEAI_ROOT exists
+        if not INVOKEAI_ROOT or not os.path.exists(INVOKEAI_ROOT):
+            self.console.log(
+                f'[red]INVOKEAI_ROOT environment variable not set or invalid:[/red] {INVOKEAI_ROOT}')
+            exit(1)
+
+        # check if project path is set
+        if not self.args.project_path:
+            self.console.log(
+                f'[red]Project path not set. Use [bold]invokeai init[/bold] to create a new project.[/red]')
+            exit(1)
+
+        # check if project path exists
+        if not os.path.exists(self.args.project_path):
+            self.console.log(
+                f'[red]Project path not found:[/red] {self.args.project_path}')
+            exit(1)
+
+        # check if project path is a directory
+        if not os.path.isdir(self.args.project_path):
+            self.console.log(
+                f'[red]Project path is not a directory:[/red] {self.args.project_path}')
+            exit(1)
+
+        # get project name from path
+        project_name = os.path.basename(self.args.project_path)
+
+        # date in yyyy-mm-dd format
+        steps = self.config.get('max_train_steps')
+
+        archive_zip_basename = f"{project_name}-{steps}"
+
+        # create archive path
+        # archive_path = os.path.join(INVOKEAI_ROOT, 'archives')
+        # os.makedirs(archive_path, exist_ok=True)
+
+        # # create zip archive
+        # archive_file = shutil.make_archive(
+        #     archive_zip_basename, 'zip',
+        #     root_dir=os.getcwd(),
+        #     exclude=shutil.ignore_patterns('*.jpg', '*.png','*.gif')
+        #     )
+
+        # create tar file
+        EXCLUDED_FILES = []
+
+        def isExcluded(f):
+            # get basename of file
+            basename = os.path.basename(f.name)
+            return None if basename in EXCLUDED_FILES else f
+
+        tar = TarFile.open(f"{archive_zip_basename}.tar.gz", "w:gz")
+        tar.add(
+            self.args.project_path,
+            recursive=True,
+            filter=isExcluded #None if x.name in EXCLUDED_FILES else x
+        )
+        tar.close()
+
+
+        # make archive with excluded files
+
+
+
+        # zip with directories excluded
+        # archive_file = shutil.make_archive(
+        #     archive_zip_basename, 'zip',
+        #     root_dir=os.getcwd(),
+        #     base_dir=
+
+        #     # exclude directories
+        #     # exclude=shutil.ignore_patterns('*.pyc', 'tmp*')
+        # )
+
+
+
+            # self.args.project_path)
+
+        # delete project folder
+        # shutil.rmtree(self.args.project_path)
+
+        self.console.log(f"Created archive file: [bold]{tar}[/bold]")
+
+
 class ModeInstall():
     def __init__(self, config, args):
         global console
@@ -629,7 +729,7 @@ class ModeInstall():
         if not INVOKEAI_ROOT or not os.path.exists(INVOKEAI_ROOT):
             self.console.log(
                 f'[red]INVOKEAI_ROOT environment variable not set or invalid:[/red] {INVOKEAI_ROOT}')
-            os._exit(1)
+            exit(1)
 
         embed_path = os.path.join(INVOKEAI_ROOT, 'embeddings')
 
@@ -637,7 +737,7 @@ class ModeInstall():
         if not os.path.exists(embed_path):
             self.console.log(
                 f'[red]Invoke root exists, but embeddings path not found:[/red] {embed_path}')
-            os._exit(1)
+            exit(1)
 
         final_embed_path = os.path.join(
             self.config['output_path'],
@@ -647,7 +747,7 @@ class ModeInstall():
         if not os.path.exists(final_embed_path):
             self.console.log(
                 f'[red]Final embedding file not found -- did training finish?[/red] {final_embed_path}')
-            os._exit(1)
+            exit(1)
 
         destination_embed_name = os.path.join(
             embed_path,
@@ -660,7 +760,7 @@ class ModeInstall():
             )
             if not Prompt.ask("Overwrite?", choices=['yes', 'no'], default='no') == 'yes':
                 self.console.log('Aborted')
-                os._exit(1)
+                exit(1)
 
         self.console.log(
             f"[green]Installing[/green] {destination_embed_name}...")
@@ -670,7 +770,7 @@ class ModeInstall():
             shutil.copyfile(final_embed_path, destination_embed_name)
         except Exception as e:
             self.console.log(f'[red]Error copying file:[/red] {e}')
-            os._exit(1)
+            exit(1)
 
         self.console.log(
             f"[green]Done.[/green]")
@@ -697,9 +797,8 @@ def loadConfig(project_path):
 MODES = {
     'init': ModeInit,
     'train': ModeTrain,
-    'install': ModeInstall
-
-
+    'install': ModeInstall,
+    # 'archive': ModeArchive,
     # 'publish': ModePublish
 }
 
@@ -712,7 +811,7 @@ def main():
 
     # accept a single-word command, required
     parser.add_argument('command', choices=[
-                        'init', 'train', 'publish', 'install'], help='todo')
+                        'init', 'train', 'publish', 'install', 'archive'], help='todo')
 
     # one or many files
     parser.add_argument('project_path',
@@ -728,7 +827,7 @@ def main():
 
     if len(sys.argv) == 1:
         parser.print_help()
-        os._exit(1)
+        exit(1)
 
     args = parser.parse_args()
 
@@ -737,21 +836,20 @@ def main():
         if args.command in ['train', 'publish', 'install']:
             if not os.path.exists(args.project_path):
                 console.log('Cannot open project path: ', args.project_path)
-                os._exit(1)
+                exit(1)
             loadConfig(args.project_path)
             console.log('Project path: ', args.project_path)
             console.log(config)
         else:
-
             if os.path.exists(os.path.join(args.project_path, PROJECT_CONFIG_FILE)):
                 console.log('Project already exists: ', args.project_path)
-                os._exit(1)
+                exit(1)
 
         mode = MODES[args.command](config, args)
         mode.run()
     else:
         console.log('Unimplemented command: ', args.command)
-        os._exit(1)
+        exit(1)
 
 
 if __name__ == '__main__':
