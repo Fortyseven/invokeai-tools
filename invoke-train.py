@@ -811,7 +811,8 @@ def main():
 
     # accept a single-word command, required
     parser.add_argument('command', choices=[
-                        'init', 'train', 'publish', 'install', 'archive'], help='todo')
+                        # 'init', 'train', 'publish', 'install', 'archive'], help='todo')
+                        'init', 'train', 'install'], help='todo')
 
     # one or many files
     parser.add_argument('project_path',
